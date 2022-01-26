@@ -41,7 +41,12 @@ export class NetworkGraphComponent implements OnInit {
       .data(links)
       .enter()
       .append('line')
-      .attr('stroke', ((link: any) => link.color || 'black') as any);
+      .attr('stroke', ((link: any) => link.color || 'black') as any)
+      .attr('visibility', 'visible')
+      .attr('class', (link: any) => `line-${ link.source.id }`)
+      .attr('id', (link: any) => `line-${ link.source.id }`)
+
+
 
     for(let link of links){
       linkedByIndex[link.source.index + "," + link.target.index] = 1;
@@ -55,10 +60,14 @@ export class NetworkGraphComponent implements OnInit {
       .append('circle')
       .attr('fill', ((node: any) => node.color || 'gray') as any)
       .attr('r', ((node: any) => node.size) as any)
+      .attr('class', (node: any) => `node-${ node.id }`)
+      .attr('id', (node: any) => `node-${ node.id }`)
+      .attr('visibility', 'visible')
       .call(dragInteraction)
       .on("mouseover", mouseover)
       .on("mouseout", (node:any) => mouseout(node))
-      .on("contextmenu", (node:any) =>  alert(JSON.stringify(node.srcElement.__data__)));
+      .on("contextmenu", (node:any) =>  alert(JSON.stringify(node.srcElement.__data__)))
+      .on("click", (n: any) => displayChildNodes(n.srcElement.__data__))
     
     const text = svg
       .selectAll('text')
@@ -67,6 +76,9 @@ export class NetworkGraphComponent implements OnInit {
       .append('text')
       .attr('text-anchor', ('middle') as any)
       .attr('alignment-baseline', ('middle') as any)
+      .attr('class', (node: any) => `text-${ node.id }`)
+      .attr('id', (node: any) => `text-${ node.id }`)
+      .attr('visibility', 'visible')
       .style('pointer-events', ('none') as any)
       .text( (node: any) => node.id );
     
@@ -82,15 +94,34 @@ export class NetworkGraphComponent implements OnInit {
           .attr("cx",legendIconX)
           .attr("cy",legendIconY)
           .attr("r", 6)
+          .attr("id", `legend-color-${ node.id }`)
           .style("fill", node.color)
+          .on('click', () => {
+            const legendText = document.getElementById(`legend-${ node.id }`)!;
+            const circleNode = document.getElementById(`node-${ node.id }`)!;
+            const circleText = document.getElementById(`text-${ node.id }`)!;
+
+            if(legendText.style.textDecoration === 'none'){
+              legendText.style.textDecoration = 'line-through'
+              circleNode.style.visibility = 'hidden';
+              circleText.style.visibility = 'hidden';
+            } else if(legendText.style.textDecoration === 'line-through') {
+              legendText.style.textDecoration = 'none';
+              circleNode.style.visibility = 'visible';
+              circleText.style.visibility = 'visible';
+            }
+
+          })
         svg
           .append("text")
           .attr("x", legendTextX)
           .attr("y", legentTextY)
           .attr("alignment-baseline","middle")
+          .attr("id", `legend-${ node.id }`)
           .text(node.id)
           .style("font-size", "15px")
           .style('pointer-events', ('none') as any)
+          .style("text-decoration", 'none')
         legendIconY = legentTextY += 18;
       }
     } 
@@ -111,10 +142,6 @@ export class NetworkGraphComponent implements OnInit {
           .attr('x2', ((link: any) => link.target.x) as any)
           .attr('y2', ((link: any) => link.target.y) as any)
       });
-
-    function neighboring(a: any, b: any) {
-      return linkedByIndex[a.index + "," + b.index] || a.source.id === b.id;
-    }
 
     function mouseover(d: any) {
         lines
@@ -152,12 +179,9 @@ export class NetworkGraphComponent implements OnInit {
         .style("opacity", 1);
      }
 
-   /* function zoomed() {
-      svg.attr("transform", "translate(" +  + ")scale(" + event.scale + ")");
-     }
-*/
-    function getLinks(o: any){
-      const result = [];
+    function getLinks(o: any, child_nodes: boolean = false){
+      let result = [];
+      
       for(let link of links){
         if(link.source.id === o.id){
           result.push(link.target.id);
@@ -166,9 +190,39 @@ export class NetworkGraphComponent implements OnInit {
           result.push(link.source.id);
         }
       }
+      if(child_nodes){
+        const res = [];
+
+        for(let nodeID of result){
+          const node = document.getElementById(`node-${nodeID}`)!;
+          if(o.color === node.getAttribute('fill')){
+            res.push(nodeID);
+          } 
+        }
+
+        result = res;
+
+      }
       return result;
     }
 
+    function displayChildNodes(n: any){
+      const nodes = getLinks(n, true);
+      for(let nodeID of nodes){
+        const node = document.getElementsByClassName(`node-${ nodeID }`)!;
+        const text = document.getElementsByClassName(`text-${ nodeID }`)!;
+        const line = document.getElementsByClassName(`line-${ nodeID }`)!;
+        changeChildNodesVisibility(node);
+        changeChildNodesVisibility(text);
+        changeChildNodesVisibility(line);
+      }
+    }
+
+    function changeChildNodesVisibility(elements: any){
+      for(let element of elements){
+        element.getAttribute('visibility') === 'visible' ? element.setAttribute('visibility', 'hidden') : element.setAttribute('visibility', 'visible');
+      }
+    }
     
   }
 

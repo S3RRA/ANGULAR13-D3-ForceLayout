@@ -42,9 +42,10 @@ export class NetworkGraphComponent implements OnInit {
       .enter()
       .append('line')
       .attr('stroke', ((link: any) => link.color || 'black') as any)
-      .attr('visibility', 'visible')
+      .attr('visibility', (link: any) => link.source.type === 'Main' && link.target.type === 'Main' ? 'visible !important' : link.visibility )
       .attr('class', (link: any) => `line-${ link.source.id }`)
-      .attr('id', (link: any) => `line-${ link.source.id }`)
+      .attr('source', (link: any) => link.source.id )
+      .attr('target', (link: any) => link.target.id )
 
 
 
@@ -62,12 +63,14 @@ export class NetworkGraphComponent implements OnInit {
       .attr('r', ((node: any) => node.size) as any)
       .attr('class', (node: any) => `node-${ node.id }`)
       .attr('id', (node: any) => `node-${ node.id }`)
-      .attr('visibility', 'visible')
+      .attr('visibility', (node: any) => node.visibility ? node.visibility : 'hidden')
+      .attr('parents', (node: any) => node.parents ? node.parents : '')
       .call(dragInteraction)
       .on("mouseover", mouseover)
       .on("mouseout", (node:any) => mouseout(node))
       .on("contextmenu", (node:any) =>  alert(JSON.stringify(node.srcElement.__data__)))
-      .on("click", (n: any) => displayChildNodes(n.srcElement.__data__))
+      .on("click", (n:any) => experiment(n.srcElement.__data__))
+      //.on("click", (n: any) => displayChildNodes(n.srcElement.__data__))
     
     const text = svg
       .selectAll('text')
@@ -78,7 +81,7 @@ export class NetworkGraphComponent implements OnInit {
       .attr('alignment-baseline', ('middle') as any)
       .attr('class', (node: any) => `text-${ node.id }`)
       .attr('id', (node: any) => `text-${ node.id }`)
-      .attr('visibility', 'visible')
+      .attr('visibility', (node: any) => node.visibility ? node.visibility : 'hidden')
       .style('pointer-events', ('none') as any)
       .text( (node: any) => node.id );
     
@@ -121,7 +124,8 @@ export class NetworkGraphComponent implements OnInit {
           .text(node.id)
           .style("font-size", "15px")
           .style('pointer-events', ('none') as any)
-          .style("text-decoration", 'none')
+          .style("text-decoration", () => node.visibility === 'visible' ? 'none' : 'line-through')
+          .style("font-weight", () =>  node.visibility === 'visible' ? 'bold' : 'normal')
         legendIconY = legentTextY += 18;
       }
     } 
@@ -156,11 +160,11 @@ export class NetworkGraphComponent implements OnInit {
         circles
           .transition()
           .duration(500)
-          .style("opacity", function(o: any) {
+          /*.style("opacity", function(o: any) {
             let relatedNodes = getLinks(d.srcElement.__data__);
             relatedNodes.push(d.srcElement.__data__.id);
             return relatedNodes.includes(o.id) ? 1 : .1;
-        });
+          });*/
     }
 
     function mouseout(d: any) { 
@@ -179,49 +183,56 @@ export class NetworkGraphComponent implements OnInit {
         .style("opacity", 1);
      }
 
-    function getLinks(o: any, child_nodes: boolean = false){
-      let result = [];
+    function experiment(node: any){
+      const node_lines: any = document.getElementsByClassName(`line-${ node.id }`);
+      for(let line of node_lines){
+        const target_node = document.getElementById(`node-${ line.getAttribute('target') }`)!;
+        const target_text = document.getElementById(`text-${ line.getAttribute('target') }`)!;
+        let other_parents = target_node.getAttribute('parents')!.split('*');
+        other_parents = [...new Set(other_parents)];
+        let myindex = other_parents.indexOf('undefined');
+        other_parents.splice(myindex, 1);
+        changeVisibility(line);
+        changeVisibility(target_text);
+        changeVisibility(target_node, other_parents);
+      }
+    }
+
+    function changeVisibility(el: any, all_parents?: any){
+      if(all_parents){
+        for(let id of all_parents){
+          const element = document.getElementById(`node-${ id }`)!;
+          if(element.getAttribute('visibility') === 'visible'){
+            el.setAttribute('visibility') === 'visible';
+          } else {
+            el.setAttribute('visibility') === 'hidden';            
+          }
+        }
+      }
       
-      for(let link of links){
-        if(link.source.id === o.id){
-          result.push(link.target.id);
+
+      /*
+      const result = [];
+
+      el.getAttribute('visibility') === 'visible' ? el.setAttribute('visibility', 'hidden') : el.setAttribute('visibility', 'visible');     
+      
+      if(other_parents){
+        for(let id of other_parents){
+          if(id !== 'undefined'){
+            const link_: any = document.getElementsByClassName(`line-${ id }`)!;
+            for(let link of link_){
+              result.push(link);
+            }
+          }         
         }
-        if(link.target.id === o.id){
-          result.push(link.source.id);
+        for(let line of result){
+          const target_node = document.getElementById(`node-${ line.getAttribute('target') }`)!;
+          const target_text = document.getElementById(`text-${ line.getAttribute('target') }`)!;
+          if(target_node.getAttribute('visibility') === 'hidden') target_node.setAttribute('visibility', 'visible');
+          if(target_text.getAttribute('visibility') === 'hidden') target_text.setAttribute('visibility', 'visible');
         }
       }
-      if(child_nodes){
-        const res = [];
-
-        for(let nodeID of result){
-          const node = document.getElementById(`node-${nodeID}`)!;
-          if(o.color === node.getAttribute('fill')){
-            res.push(nodeID);
-          } 
-        }
-
-        result = res;
-
-      }
-      return result;
-    }
-
-    function displayChildNodes(n: any){
-      const nodes = getLinks(n, true);
-      for(let nodeID of nodes){
-        const node = document.getElementsByClassName(`node-${ nodeID }`)!;
-        const text = document.getElementsByClassName(`text-${ nodeID }`)!;
-        const line = document.getElementsByClassName(`line-${ nodeID }`)!;
-        changeChildNodesVisibility(node);
-        changeChildNodesVisibility(text);
-        changeChildNodesVisibility(line);
-      }
-    }
-
-    function changeChildNodesVisibility(elements: any){
-      for(let element of elements){
-        element.getAttribute('visibility') === 'visible' ? element.setAttribute('visibility', 'hidden') : element.setAttribute('visibility', 'visible');
-      }
+      */
     }
     
   }
